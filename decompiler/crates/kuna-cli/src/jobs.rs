@@ -1835,7 +1835,7 @@ impl Faults {
                     }
                 }
                 Fault::Stall => {
-                    eprintln!("{JOBS_FAULT_ENV}: injected stall at {addr:#x}");
+                    fault_line(&format!("{JOBS_FAULT_ENV}: injected stall at {addr:#x}"));
                     loop {
                         std::thread::sleep(Duration::from_secs(3600));
                     }
@@ -1854,7 +1854,7 @@ impl Faults {
                 std::fs::OpenOptions::new().write(true).create_new(true).open(marker).is_ok()
             });
         if fire {
-            eprintln!("{JOBS_FAULT_ENV}: injected load abort");
+            fault_line(&format!("{JOBS_FAULT_ENV}: injected load abort"));
             std::alloc::handle_alloc_error(std::alloc::Layout::new::<[u8; 1 << 20]>());
         }
     }
@@ -1868,6 +1868,14 @@ impl Faults {
     fn refuses_spawn(&self, n: usize) -> bool {
         self.spawn_after.is_some_and(|after| n >= after)
     }
+}
+
+/// Write one fault line to stderr in a single write. `eprintln!` writes each
+/// piece of its format separately, so two workers failing at once could splice
+/// their lines together on the shared pipe, and a test counting the lines
+/// would miss one.
+fn fault_line(line: &str) {
+    let _ = std::io::stderr().lock().write_all(format!("{line}\n").as_bytes());
 }
 
 // --- progress ----------------------------------------------------------------
